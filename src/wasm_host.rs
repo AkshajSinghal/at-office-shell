@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use wasmtime::{Caller, Engine, Instance, Linker, Memory, Module, Store, Trap};
+use wasmtime::{Caller, Engine, Instance, Linker, Memory, Module, Store};
+
+type HostResult<T> = Result<T, anyhow::Error>;
 
 const SUPPORTED_PLUGIN_API_VERSION: &str = "1.0";
 const INPUT_OFFSET: usize = 1024;
@@ -155,37 +157,37 @@ fn register_host_functions(linker: &mut Linker<PluginState>, manifest: &PluginMa
     Ok(())
 }
 
-fn read_guest_string(caller: &mut Caller<'_, PluginState>, ptr: i32, len: i32) -> Result<String, Trap> {
+fn read_guest_string(caller: &mut Caller<'_, PluginState>, ptr: i32, len: i32) -> HostResult<String> {
     let memory = guest_memory(caller)?;
     let ptr = ptr
         .try_into()
-        .map_err(|_| Trap::new("negative pointer passed from plugin"))?;
+        .map_err(|_| anyhow::anyhow!("negative pointer passed from plugin"))?;
     let len = len
         .try_into()
-        .map_err(|_| Trap::new("negative string length passed from plugin"))?;
+        .map_err(|_| anyhow::anyhow!("negative string length passed from plugin"))?;
 
     let mut buffer = vec![0u8; len];
     memory
         .read(caller, ptr, &mut buffer)
-        .map_err(|_| Trap::new("failed to read memory from plugin"))?;
-    String::from_utf8(buffer).map_err(|_| Trap::new("plugin string is not valid UTF-8"))
+        .map_err(|_| anyhow::anyhow!("failed to read memory from plugin"))?;
+    String::from_utf8(buffer).map_err(|_| anyhow::anyhow!("plugin string is not valid UTF-8"))
 }
 
-fn write_guest_bytes(caller: &mut Caller<'_, PluginState>, ptr: i32, bytes: &[u8]) -> Result<(), Trap> {
+fn write_guest_bytes(caller: &mut Caller<'_, PluginState>, ptr: i32, bytes: &[u8]) -> HostResult<()> {
     let memory = guest_memory(caller)?;
     let ptr = ptr
         .try_into()
-        .map_err(|_| Trap::new("negative pointer passed from plugin"))?;
+        .map_err(|_| anyhow::anyhow!("negative pointer passed from plugin"))?;
     memory
         .write(caller, ptr, bytes)
-        .map_err(|_| Trap::new("failed to write memory to plugin"))
+        .map_err(|_| anyhow::anyhow!("failed to write memory to plugin"))
 }
 
-fn guest_memory(caller: &mut Caller<'_, PluginState>) -> Result<Memory, Trap> {
+fn guest_memory(caller: &mut Caller<'_, PluginState>) -> HostResult<Memory> {
     caller
         .get_export("memory")
         .and_then(|export| export.into_memory())
-        .ok_or_else(|| Trap::new("failed to find exported memory"))
+        .ok_or_else(|| anyhow::anyhow!("failed to find exported memory"))
 }
 
 #[derive(Debug)]

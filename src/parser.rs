@@ -254,15 +254,17 @@ impl<'a> Lexer<'a> {
                     tokens.push(Token::Plus);
                 }
                 '-' => {
-                    // Could be a flag like `-la` or `--help`. If the hyphen is followed
-                    // by a letter or another hyphen, lex the whole word as a Flag token.
+                    // Could be a flag like `-la`, `--help`, or `-1`.
+                    // Only treat a preceding hyphen as a subtraction operator when it is
+                    // followed by an actual operator delimiter or end of input.
                     if let Some(second) = {
-                        // clone iterator to peek two chars ahead safely
                         let mut it = self.chars.clone();
                         it.next(); // current '-'
                         it.peek().cloned()
                     } {
-                        if second.is_alphabetic() || second == '-' {
+                        if !second.is_whitespace()
+                            && !matches!(second, '>' | '<' | '|' | '&' | ';' | '(' | ')' | '{' | '}' | '=' | '+' | '*' | '/')
+                        {
                             tokens.push(self.lex_flag()?);
                         } else {
                             self.chars.next();
@@ -630,7 +632,7 @@ impl Parser {
         loop {
             match self.peek() {
                 Some(Token::LParen) => {
-                    expression = self.parse_call(name.clone())?;
+                    expression = self.parse_call(expression)?;
                 }
                 Some(Token::LBrace) => {
                     let block = self.parse_block()?;
@@ -654,7 +656,7 @@ impl Parser {
         Ok(expression)
     }
 
-    fn parse_call(&mut self, name: String) -> Result<ASTNode> {
+    fn parse_call(&mut self, function: ASTNode) -> Result<ASTNode> {
         self.expect_token(Token::LParen)?;
         let mut args = Vec::new();
 
@@ -669,7 +671,21 @@ impl Parser {
 
         self.expect_token(Token::RParen)?;
 
+        let name = self.expression_to_command_name(&function)
+            .ok_or_else(|| ParseError::new("Unsupported function call target"))?;
+
         Ok(ASTNode::Command { name, args })
+    }
+
+    fn expression_to_command_name(&self, expression: &ASTNode) -> Option<String> {
+        match expression {
+            ASTNode::Identifier(name) => Some(name.clone()),
+            ASTNode::Variable(name) => Some(name.clone()),
+            ASTNode::PropertyAccess { target, property } => {
+                self.expression_to_command_name(target).map(|base| format!("{}.{property}", base))
+            }
+            _ => None,
+        }
     }
 
     fn parse_block(&mut self) -> Result<ASTNode> {
@@ -705,7 +721,15 @@ impl Parser {
     }
 
     fn peek_is_command_token(&self) -> bool {
-        matches!(self.peek(), Some(Token::Identifier(_)) | Some(Token::Word(_)))
+        matches!(self.peek(),
+            Some(Token::Identifier(_))
+            | Some(Token::Word(_))
+            | Some(Token::Flag(_))
+            | Some(Token::StringLiteral(_))
+            | Some(Token::Number(_))
+            | Some(Token::Boolean(_))
+            | Some(Token::LParen)
+        )
     }
 
     fn peek_is_end_of_command(&self) -> bool {
@@ -726,25 +750,20 @@ impl Parser {
 
         while let Some(token) = self.peek().cloned() {
             match token {
-                Token::Word(text) => {
-                    self.next();
-                    args.push(ASTNode::Literal(Literal::String(text)));
-                }
-                Token::Identifier(text) => {
-                    self.next();
-                    args.push(ASTNode::Literal(Literal::String(text)));
-                }
-                Token::Flag(text) => {
-                    self.next();
-                    args.push(ASTNode::Literal(Literal::String(text)));
-                }
-                Token::StringLiteral(text) => {
+                Token::Word(text)
+                | Token::Identifier(text)
+                | Token::Flag(text)
+                | Token::StringLiteral(text) => {
                     self.next();
                     args.push(ASTNode::Literal(Literal::String(text)));
                 }
                 Token::Number(text) => {
                     self.next();
-                    args.push(ASTNode::Literal(Literal::String(text)));
+                    args.push(ASTNode::Literal(self.parse_number_literal(&text)?));
+                }
+                Token::Boolean(value) => {
+                    self.next();
+                    args.push(ASTNode::Literal(Literal::Boolean(value)));
                 }
                 Token::Fd(_) => break,
                 _ if self.peek_redirect_start() => break,

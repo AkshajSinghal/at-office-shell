@@ -1,8 +1,10 @@
+mod dotfiles;
 mod parser;
 mod job_control;
 mod terminal;
 mod wasm_host;
 
+use crate::dotfiles::import_dotfiles;
 use crate::wasm_host::{load_plugin_manifest, WasmPlugin};
 use std::io::{self, Write};
 
@@ -11,6 +13,22 @@ fn main() {
 
     // Initialize job control and signal handlers
     job_control::init_signal_handlers();
+    if let Ok(home) = std::env::var("HOME") {
+        match import_dotfiles(std::path::Path::new(&home)) {
+            Ok(imports) => {
+                for import in &imports {
+                    if !import.commands.is_empty() {
+                        println!("Imported {} ({} commands)", import.path, import.commands.len());
+                    }
+                    for warning in &import.warnings {
+                        eprintln!("compat: {}", warning.message);
+                    }
+                }
+            }
+            Err(err) => eprintln!("dotfiles: failed to import startup files: {err}"),
+        }
+    }
+
     let mut terminal = terminal::Terminal::new(24, 80);
 
     loop {

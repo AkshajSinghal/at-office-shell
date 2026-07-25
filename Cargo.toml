@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["TruFoundation <noreply@trufoundation.org>"]
 
 [dependencies]
+anyhow = "1.0"
 crossterm = "0.27"
 signal-hook = "0.3"
 nix = "0.27"
