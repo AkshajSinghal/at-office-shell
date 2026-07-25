@@ -24,7 +24,7 @@ Decision escalation
 - If maintainers disagree, escalate to Steering Committee for arbitration.
 
 Security & reporting
-- Responsible disclosure: email security@trufoundation.org
+- Use the discussions sections to get to the maintainers' notice, then tell them privately.
 - Security issues are triaged by the security maintainer; public disclosure follows coordinated timeline.
 
 This is a living document and may be updated by the Steering Committee.
