@@ -39,6 +39,6 @@ Communication
 - Primary channels: GitHub (issues/PRs), Discussions (for design), and our chat/Matrix/Discord (see GOVERNANCE.md for links).
 
 Security & reporting
-- Report security issues to security@trufoundation.org (private) or use the security disclosure process documented in GOVERNANCE.md.
+- Use the security disclosure process documented in GOVERNANCE.md.
 
 Thank you for contributing to TruShell.
