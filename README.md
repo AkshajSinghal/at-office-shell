@@ -1,32 +1,14 @@
-
-```
-████████████████████████████████████████████████████████████████████████
-█                                                                      █
-█  ████████╗██████╗ ██╗   ██╗███████╗██╗  ██╗███████╗██╗     ██╗       █
-█  ╚══██╔══╝██╔══██╗██║   ██║██╔════╝██║  ██║██╔════╝██║     ██║       █
-█     ██║   ██████╔╝██║   ██║███████╗███████║█████╗  ██║     ██║       █
-█     ██║   ██╔══██╗██║   ██║╚════██║██╔══██║██╔══╝  ██║     ██║       █
-█     ██║   ██║  ██║╚██████╔╝███████║██║  ██║███████╗███████╗███████╗  █
-█     ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝  █
-█                                                                      █
-█                                                                      █    
-█                      The Next-Generation Shell                       █
-█                    Built in Rust for Performance                     █
-█                                                                      █
-████████████████████████████████████████████████████████████████████████
-```
-
 # TruShell
 
-A general-purpose shell written in Rust. Like Bash and Zsh, but with modern syntax and task management baked in.
+A general-purpose shell written in Rust. Like Bash and Zsh, but with a modern expression language and task management features planned.
 
 Status: Alpha (actively developing)
 
 ---
 
-## QUICK START
+## Quick start
 
-### Installation
+### Install from source
 
 ```bash
 $ git clone https://github.com/TruFoundation/TruShell.git
@@ -35,261 +17,74 @@ $ cargo build --release
 $ ./target/release/trushell
 ```
 
-Or run directly:
+Or run directly for development:
 
 ```bash
 $ cargo run
 ```
 
-### Your First Commands
-
-```bash
-Welcome to TruShell Native Engine
-trushell> pwd
-/home/user/projects
-
-trushell> ls -la
-total 48
-drwxr-xr-x  5 user  staff   160 Jul  5 12:34 .
--rw-r--r--  1 user  staff  1234 Jul  05 12:30 README.md
-
-trushell> let x = 42
-trushell> let result = $x * 2
-```
+Notes:
+- Rust 1.70+ is required (Edition 2021).
+- If a prebuilt release is published in the future, you can download that instead of building locally.
 
 ---
 
-## WHAT IS TRUSHELL?
+## What is TruShell?
 
-TruShell is a modern shell that:
+TruShell is a modern, extensible shell that:
 
-- Runs standard Unix commands: ls, cat, grep, cd, etc.
-- Understands expressions: arithmetic, variables, comparisons
-- Chains operations: pipes, redirects, filters
-- Manages tasks: integrate time tracking and task management (coming soon)
-- Written in Rust: fast, safe, and reliable
+- Runs standard Unix commands (ls, cat, grep, cd, etc.)
+- Exposes a small expression language (variables, arithmetic, comparisons)
+- Supports pipelines, redirects, and shell-style subprocess execution
+- Includes a WASM plugin host for sandboxed extensions
+- Is written in Rust for safety and performance
 
-Think of it as Bash meets a modern expression language. You get the power of the shell with cleaner, more intuitive syntax.
+Think of TruShell as an approachable shell with cleaner syntax and an AST-based execution model.
 
 ---
 
-## FEATURES
+## Highlights / Features
 
-### Interactive REPL
+- Interactive REPL with history and familiar shell commands
+- First-class variables declared with `let` and referenced with `$`
+- Numeric units for readability (e.g. `1mb`, `500ms`)
+- Pipes, redirects, and combination of stdout/stderr handling
+- WASM-based plugin host with capability-style access
+- Fallback to system command execution when a statement is not recognized
 
-Just like your favorite shell, TruShell reads input, evaluates it, prints output, and loops:
+---
+
+## Examples
+
+Interactive use:
 
 ```bash
-trushell> echo "Hello, World!"
-Hello, World!
-
-trushell> exit
-Goodbye!
-```
-
-### Variables and Expressions
-
-```bash
-# Declare variables with 'let'
 trushell> let name = "Alice"
 trushell> let age = 30
-
-# Use variables with $
-trushell> let next_year_age = $age + 1
-
-# Arithmetic
-trushell> let sum = 10 + 5
-trushell> let product = 3 * 7
+trushell> let next_year = $age + 1
+trushell> echo "Hello, $name! Next year you'll be $next_year."
 ```
 
-### Comparisons and Logic
+Pipes and file operations:
 
 ```bash
-trushell> let is_adult = $age > 18
-trushell> let is_match = "hello" == "hello"
-trushell> let not_empty = "text" != ""
+trushell> cat server.log | grep "ERROR" > errors.txt
+trushell> echo "Done" &> status.log
 ```
 
-### Number Units
+Code blocks and grouping:
 
 ```bash
-# Numbers can have units for readability
-trushell> let file_size = 1mb
-trushell> let timeout = 500ms
-```
-
-### Pipes and Redirects
-
-```bash
-# Chain commands with pipes
-trushell> cat data.txt | grep "error"
-
-# Redirect output to files
-trushell> echo "Hello" > greeting.txt
-trushell> echo "World" >> greeting.txt
-
-# Redirect stdin
-trushell> cat < input.txt > output.txt
-
-# Combine stdout and stderr
-trushell> command &> log.txt
-```
-
-### Code Blocks
-
-```bash
-# Group statements in blocks
-trushell> let data = { let x = 5; let y = 10; $x + $y }
+trushell> let sum = { let a = 5; let b = 10; $a + $b }
 ```
 
 ---
 
-## HOW IT WORKS
+## WASM plugin host
 
-TruShell uses a classic interpreter pipeline:
+TruShell can load sandboxed WASM plugins. Plugins must include a JSON manifest (placed alongside the WASM module) that declares the plugin's name, version, API version, and the capabilities it requires.
 
-```
-┌─────────────────────────────────────────┐
-│         User Input (REPL)               │
-├─────────────────────────────────────────┤
-│  Lexer: Convert text -> tokens          │
-├─────────────────────────────────────────┤
-│  Parser: Convert tokens -> AST          │
-├─────────────────────────────────────────┤
-│  Executor: Run AST or fallback to shell │
-├─────────────────────────────────────────┤
-│  Output / Side Effects                  │
-└─────────────────────────────────────────┘
-```
-
-### Example: Parsing 'let x = 5 + 3'
-
-Tokenize:
-```
-[let, x, =, 5, +, 3]
-```
-
-Parse:
-```
-Let {
-  name: "x",
-  value: BinaryOp {
-    left: 5,
-    op: Add,
-    right: 3
-  }
-}
-```
-
-Execute:
-```
-Variable x is now 8
-```
-
----
-
-## COMMAND REFERENCE
-
-### Built-in Commands
-
-| Command | Syntax | Description |
-|---------|--------|-------------|
-| let | let name = expression | Declare a variable |
-| exit | exit | Leave the shell (or Ctrl+D) |
-| cd | cd path | Change directory |
-
-### Operators
-
-Arithmetic:
-- '+' Add
-- '-' Subtract
-- '*' Multiply
-- '/' Divide
-
-Comparison:
-- '>' Greater than
-- '<' Less than
-- '>=' Greater or equal
-- '<=' Less or equal
-- '==' Equal
-- '!=' Not equal
-
-Input/Output:
-- '|' Pipe output to next command
-- '>' Write to file (overwrite)
-- '>>' Append to file
-- '<' Read from file
-- '&>' Redirect stderr and stdout
-
----
-
-## EXAMPLES
-
-### Navigation
-
-```bash
-trushell> cd /tmp
-trushell> pwd
-/tmp
-
-trushell> cd ~
-trushell> pwd
-/home/user
-```
-
-### File Operations
-
-```bash
-trushell> ls -la
-trushell> cat README.md | head -20
-trushell> grep "error" *.log > errors.txt
-trushell> cp file.txt backup.txt
-```
-
-### Calculations
-
-```bash
-trushell> let bytes = 1024
-trushell> let kilobytes = $bytes / 1024
-trushell> let total = 10 + 20 + 30 + 40
-```
-
-### Conditional Logic
-
-```bash
-trushell> let threshold = 100
-trushell> let value = 150
-trushell> let exceeds = $value > $threshold
-# exceeds is now true
-```
-
-### Complex Expressions
-
-```bash
-trushell> let x = 10
-trushell> let y = 20
-trushell> let z = $x + $y * 2
-# z is 50 (multiplication happens first)
-
-trushell> let result = ($x + $y) * 2
-# result is 60
-```
-
-## WASM Plugin Host
-
-TruShell can load sandboxed WASM plugins with a capability-based host model.
-Plugins live in `examples/plugins` and must publish a JSON manifest next to the WASM module.
-
-### Plugin CLI
-
-```bash
-trushell> plugin manifest examples/plugins/log_echo.wat
-trushell> plugin run examples/plugins/log_echo.wat "Hello from host"
-```
-
-### Plugin manifest
-
-A plugin manifest looks like this:
+Example manifest:
 
 ```json
 {
@@ -300,73 +95,37 @@ A plugin manifest looks like this:
 }
 ```
 
-### Supported capabilities
+Supported capability examples:
 
-- `logging` – allows plugins to call `host_log`.
-- `environment-get` – allows plugins to call `host_get_env`.
+- `logging` — allows the plugin to call a host logging function
+- `environment-get` — allows the plugin to read environment variables via the host
 
-### Example plugins
-
-- `examples/plugins/log_echo.wat` – logs the input string using the host logger.
-- `examples/plugins/env_logger.wat` – reads an environment variable and logs the result.
-
-### Plugin safety model
-
-Plugins are sandboxed in WASM. The host only exposes host functions for the declared capabilities.
-A plugin with missing capabilities will fail to instantiate if it imports host functions it is not allowed to call.
+Plugin examples live under `examples/plugins/` in the repository. A plugin that imports host functions it has not declared will fail to instantiate.
 
 ---
 
-## SYNTAX
+## Syntax overview
 
-### Tokens
+- Variables: `let x = 42` and reference as `$x`
+- Strings: double-quoted literals `"text"`
+- Numbers: integers and unit-suffixed numbers `1mb`, `500ms`
+- Blocks: `{ ... }` return the value of the last expression inside
+- Operators: arithmetic (`+ - * /`), comparisons (`== != > < >= <=`)
 
-TruShell recognizes the following token types:
-
-| Token Class | Examples | Purpose |
-|-------------|----------|---------|
-| Keywords | let, true, false | Language control |
-| Identifiers | x, $var, _private | Variable and function names |
-| Numbers | 42, 3mb, 100kb | Numeric literals with optional units |
-| Strings | "hello" | Quoted string literals |
-| Flags | -la, --verbose, --help | Command-line flags |
-| Operators | +, -, *, /, >, <, ==, != | Binary operations |
-| Delimiters | (), {}, [], ., ,, ; | Structure and grouping |
-| Pipes | \| | Pipeline sequencing |
-
-### Data Types
-
-TruShell supports the following literal types:
-
-```
-Number     - Integer values, optionally with units (42, 1mb, 500ms)
-String     - Double-quoted text literals ("text")
-Boolean    - true or false values
-```
-
-### Operator Precedence
-
-Operators are evaluated in this order (lowest to highest):
-
-1. Comparison Operators (>, <, >=, <=, ==, !=)
-2. Term Operators (+, -)
-3. Factor Operators (*, /)
-4. Primary (Literals, Identifiers, Parentheses, Blocks)
-
-### Variables
-
-Variables are declared with 'let' and referenced with '$':
-
-```bash
-trushell> let count = 10
-trushell> let doubled = $count * 2
-```
+Operator precedence (lowest → highest): comparison, addition/subtraction, multiplication/division, primary (literals/identifiers/parentheses).
 
 ---
 
-## ARCHITECTURE
+## Architecture
 
-### Project Structure
+The interpreter follows a familiar pipeline:
+
+1. Lexer: tokenizes input
+2. Parser: builds an AST
+3. Executor: runs the AST or falls back to system command execution
+4. Output / side effects
+
+Project layout (top-level):
 
 ```
 TruShell/
@@ -378,156 +137,85 @@ TruShell/
 └── README.md           - This file
 ```
 
-### Parsing Flow
-
-```
-User Input String
-    ↓
-Lexer::tokenize()
-    ↓
-Token Vector
-    ↓
-Parser::parse_statement()
-    ↓
-ASTNode (Abstract Syntax Tree)
-    ↓
-Execution logic
-    ↓
-Output/Side Effects
-```
-
-### Design Philosophy
-
-1. Separation of Concerns: Lexing, parsing, and execution are distinct phases
-2. Error Resilience: Parse failures trigger fallback to system command execution
-3. Minimal Dependencies: Uses only crossterm for terminal handling
-4. Extensibility: AST-based design allows easy addition of new expression types
+Design goals:
+- Separation of concerns between lexing/parsing/execution
+- Robust fallback to system commands when parsing fails
+- Minimal dependencies for portability
+- Extensible AST-based design to add language features safely
 
 ---
 
-## EXECUTION MODEL
+## Development
 
-### Command Routing
+Requirements:
 
-When you enter a command, TruShell:
+- Rust 1.70 or later
+- Cargo (bundled with Rust)
 
-1. Reads the input line
-2. Checks for special commands (exit, cd)
-3. Attempts to parse it
-4. If parse succeeds, checks if it's a recognized pattern
-5. If not recognized, falls back to executing as a system command
-
-### Special Commands
-
-exit - Terminates the shell gracefully
-
-cd path - Changes the current directory (handled specially, not as a subprocess)
-
-### Fallback Execution
-
-If parsing fails, TruShell executes the input as a system command. This means most Unix commands work transparently:
+Build & run:
 
 ```bash
-trushell> grep pattern file.txt
-trushell> find . -name "*.rs"
-trushell> ps aux | less
+# debug
+cargo build
+# release
+cargo build --release
+# run tests
+cargo test
+# enable backtraces while running
+RUST_BACKTRACE=1 cargo run
 ```
 
-### Pipes and Redirects
+Recommended workflow:
 
-TruShell supports shell-style redirection:
-
-- 'cmd > file' writes stdout to a file
-- 'cmd >> file' appends stdout to a file
-- 'cmd < file' reads stdin from a file
-- 'cmd &> file' redirects stderr to the same target file
-- 'cmd | other > file' pipes data into a redirected final stage
-
-This integration keeps parsed AST behavior aligned with traditional shell semantics.
+- Format: `cargo fmt`
+- Lint: `cargo clippy`
+- Add unit tests for new features and ensure CI passes
 
 ---
 
-## DEVELOPMENT
+## Contributing
 
-### Requirements
+We welcome contributions. Suggested flow:
 
-- Rust 1.70 or later (Edition 2021)
-- Cargo (comes with Rust)
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Implement changes and add tests
+4. Run `cargo fmt` and `cargo clippy`
+5. Commit with a clear message and push your branch
+6. Open a Pull Request describing the change and motivation
 
-### Building
-
-Debug build:
-```bash
-$ cargo build
-```
-
-Release build (optimized):
-```bash
-$ cargo build --release
-```
-
-Run tests:
-```bash
-$ cargo test
-```
-
-Run with debugging:
-```bash
-$ RUST_BACKTRACE=1 cargo run
-```
-
-### Code Guidelines
-
-- Use 'cargo fmt' for formatting
-- Run 'cargo clippy' to catch common mistakes
-- Add unit tests for new features
-- Update docs if behavior changes
-
-### Contributing
-
-We welcome contributions! Here's how to help:
-
-1. Fork the repo
-2. Create a feature branch: git checkout -b feature/awesome-feature
-3. Make your changes and write tests
-4. Commit with clear messages: git commit -m "Add awesome feature"
-5. Push: git push origin feature/awesome-feature
-6. Open a Pull Request and describe what you did
+Please open an Issue to discuss larger design changes before implementing them.
 
 ---
 
-## ROADMAP
+## Roadmap
 
-We are actively developing TruShell. Planned features:
+Planned work:
 
-- Task Management: task create, task list, task complete
-- Time Tracking: time start, time stop, time log
-- Persistence: SQLite backend for tasks
-- Configuration: .trushellrc config file
-- Custom Functions: Define and reuse scripts
-- History and Completion: Arrow keys for recall, tab completion
-- Shell Integration: Load in .bashrc / .zshrc
-
----
-
-## SUPPORT
-
-Got questions? Ideas? Bug reports?
-
-- Open an Issue on GitHub
-- Start a Discussion if you want to chat
-- Check existing issues for answers
+- Task Management (task create/list/complete)
+- Time Tracking (time start/stop/log)
+- Persistence via SQLite for tasks and history
+- Configuration file: `~/.trushellrc`
+- Command history and tab completion
+- Shell integration helpers for `.bashrc` / `.zshrc`
 
 ---
 
-## LICENSE
+## Support
 
-TruShell is released under the terms in LICENSE.md.
+Found a bug or have a question?
 
-See LICENSE.md for full details.
+- Open an issue on GitHub
+- Start a discussion if you want to brainstorm features
 
 ---
 
-Made with care by TruFoundation
+## License
 
-Empowering productivity through open-source tooling.
+TruShell is released under the terms found in LICENSE.md.
+
+---
+
+Maintainers: TruFoundation
+
+Made with care — contributions and feedback welcome.
