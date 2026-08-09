@@ -1,0 +1,23 @@
+Packaging notes
+
+This branch adds a CI workflow and helper scripts to produce Linux packages (.deb and .rpm) and run basic acceptance tests.
+
+What was added
+- .github/workflows/ci-packaging.yml: GitHub Actions workflow that builds the project, runs tests, produces .deb/.rpm packages, uploads them as artifacts, and performs simple acceptance tests.
+- packaging/build_rpm.sh: Small helper script that uses fpm to create an RPM from the release binary.
+- packaging/acceptance_test.sh: A tiny smoke-test script (expects trushell in PATH).
+
+What you should check / customize
+- Cargo.toml package metadata: cargo-deb derives package metadata from Cargo.toml under [package.metadata.deb]. Add fields like maintainer, description, assets, etc., to produce richer DEB/RPM metadata.
+- Binary name: scripts assume the built binary is target/release/trushell. If your binary name differs, update the workflow and build_rpm.sh call accordingly.
+- fpm dependencies: building RPM uses fpm; CI installs it via gem. If you prefer cargo-rpm or another tool, adjust packaging/build_rpm.sh and the workflow.
+
+How to use locally
+- Install cargo-deb: cargo install cargo-deb
+- Build .deb: cargo deb
+- Build .rpm locally: ./packaging/build_rpm.sh target/release/trushell
+
+If you'd like, I can:
+- Add Cargo.toml metadata example for cargo-deb
+- Switch RPM creation to use cargo-rpm instead of fpm
+- Open a pull request from branch ci/package-deb-rpm to your default branch
