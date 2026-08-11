@@ -44,8 +44,16 @@ fn main() {
     // Initialize Reedline with a file-backed history if available.
     let mut line_editor = if let Ok(home) = std::env::var("HOME") {
         let hist_path = PathBuf::from(home).join(".trushell_history");
-        match FileBackedHistory::with_file(1000, hist_path) {
-            Ok(history) => Reedline::with_history(Box::new(history)),
+        match FileBackedHistory::with_file(1000, hist_path.clone()) {
+            Ok(history) => {
+                // On Unix, harden the history file permissions to 0o600.
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(&hist_path, std::fs::Permissions::from_mode(0o600));
+                }
+                Reedline::with_history(Box::new(history))
+            }
             Err(_) => Reedline::create(),
         }
     } else {
