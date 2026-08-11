@@ -8,6 +8,10 @@ use crate::dotfiles::import_dotfiles;
 use crate::wasm_host::{load_plugin_manifest, WasmPlugin};
 use std::io::{self, Write};
 
+use reedline::{DefaultPrompt, Reedline, Signal};
+use reedline::history::FileBackedHistory;
+use std::path::PathBuf;
+
 fn main() {
     println!("Welcome to TruShell Native Engine");
 
@@ -31,103 +35,117 @@ fn main() {
 
     let mut terminal = terminal::Terminal::new(24, 80);
 
-    loop {
-        let prompt = terminal.prompt();
-        print!("{prompt}");
-        if let Err(e) = io::stdout().flush() {
-            eprintln!("Prompt flush error: {}", e);
-            continue;
-        }
+    // --- reedline setup ---
+    // Use the same ANSI-colored prompt returned by terminal.prompt()
+    let prompt_text = terminal.prompt();
+    let prompt = DefaultPrompt::new(prompt_text.clone());
+    let mut line_editor = Reedline::create();
 
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(0) => break, // Ctrl+D to exit safely
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("Error reading input: {}", e);
+    // Setup history file at $HOME/.trushell_history
+    if let Ok(home) = std::env::var("HOME") {
+        let hist_path = PathBuf::from(home).join(".trushell_history");
+        if let Ok(history) = FileBackedHistory::with_file(1000, hist_path) {
+            line_editor.set_history(Box::new(history));
+        }
+    }
+    // -----------------------
+
+    loop {
+        match line_editor.read_line(&prompt) {
+            Ok(Signal::Success(buffer)) => {
+                let trimmed_input = buffer.trim();
+                if trimmed_input.is_empty() {
+                    continue;
+                }
+
+                if trimmed_input == "exit" {
+                    println!("Goodbye!");
+                    break;
+                }
+
+                let parts = split_posix_words(trimmed_input);
+                if parts.first().map(String::as_str) == Some("cd") {
+                    let new_dir = parts
+                        .get(1)
+                        .cloned()
+                        .unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+                    if let Err(e) = std::env::set_current_dir(new_dir.as_str()) {
+                        eprintln!("trushell: cd: {}: {}", new_dir, e);
+                    }
+                    continue;
+                }
+
+                if parts.first().map(String::as_str) == Some("plugin") {
+                    match parts.get(1).map(String::as_str) {
+                        Some("run") => {
+                            let module_path = parts.get(2).cloned();
+                            let input = parts.get(3).cloned().unwrap_or_default();
+                            if let Some(path) = module_path {
+                                match WasmPlugin::load(&path) {
+                                    Ok(mut plugin) => match plugin.run(&input) {
+                                        Ok(logs) => {
+                                            for line in logs {
+                                                println!("plugin: {line}");
+                                            }
+                                        }
+                                        Err(err) => eprintln!("Plugin execution failed: {}", err),
+                                    },
+                                    Err(err) => eprintln!("Failed to load plugin: {}", err),
+                                }
+                            } else {
+                                eprintln!("Usage: plugin run <module.wasm|module.wat> [input]");
+                            }
+                        }
+                        Some("manifest") => {
+                            if let Some(path) = parts.get(2) {
+                                match load_plugin_manifest(path) {
+                                    Ok(manifest) => {
+                                        println!("Plugin: {}@{}", manifest.name, manifest.version);
+                                        println!("API version: {}", manifest.api_version);
+                                    }
+                                    Err(err) => eprintln!("Failed to load plugin manifest: {}", err),
+                                }
+                            } else {
+                                eprintln!("Usage: plugin manifest <manifest.json>");
+                            }
+                        }
+                        _ => {
+                            eprintln!("Unknown plugin command");
+                        }
+                    }
+                    continue;
+                }
+
+                // Try to parse as TruShell AST -> execution (existing code path)
+                match parser::parse_line(trimmed_input) {
+                    Ok(ast) => {
+                        if let Some((cmd, args)) = probable_cli_from_ast(&ast) {
+                            execute_system_command(&cmd, &args);
+                        } else {
+                            // Placeholder: existing executor should handle AST execution here.
+                            // For now we print the parsed AST (retain current behavior).
+                            println!("Parsed AST: {:#?}", ast);
+                        }
+                    }
+                    Err(_) => {
+                        // Fallback to running as a system command if parsing fails
+                        execute_system_command_from_input(trimmed_input);
+                    }
+                }
+            }
+            Ok(Signal::CtrlC) => {
+                // interrupt — print a newline and continue
+                println!();
                 continue;
             }
-        }
-
-        // Clean trailing newlines and whitespace completely
-        let trimmed_input = input.trim();
-        if trimmed_input.is_empty() {
-            continue;
-        }
-
-        if trimmed_input == "exit" {
-            println!("Goodbye!");
-            break;
-        }
-
-        let parts = split_posix_words(trimmed_input);
-        if parts.first().map(String::as_str) == Some("cd") {
-            let new_dir = parts
-                .get(1)
-                .cloned()
-                .unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
-            if let Err(e) = std::env::set_current_dir(new_dir.as_str()) {
-                eprintln!("trushell: cd: {}: {}", new_dir, e);
-            }
-            continue;
-        }
-
-        if parts.first().map(String::as_str) == Some("plugin") {
-            match parts.get(1).map(String::as_str) {
-                Some("run") => {
-                    let module_path = parts.get(2).cloned();
-                    let input = parts.get(3).cloned().unwrap_or_default();
-                    if let Some(path) = module_path {
-                        match WasmPlugin::load(&path) {
-                            Ok(mut plugin) => match plugin.run(&input) {
-                                Ok(logs) => {
-                                    for line in logs {
-                                        println!("plugin: {line}");
-                                    }
-                                }
-                                Err(err) => eprintln!("Plugin execution failed: {}", err),
-                            },
-                            Err(err) => eprintln!("Failed to load plugin: {}", err),
-                        }
-                    } else {
-                        eprintln!("Usage: plugin run <module.wasm|module.wat> [input]");
-                    }
-                }
-                Some("manifest") => {
-                    if let Some(path) = parts.get(2) {
-                        match load_plugin_manifest(path) {
-                            Ok(manifest) => {
-                                println!("Plugin: {}@{}", manifest.name, manifest.version);
-                                println!("API version: {}", manifest.api_version);
-                                println!("Capabilities: {:?}", manifest.capabilities);
-                            }
-                            Err(err) => eprintln!("Failed to load manifest: {}", err),
-                        }
-                    } else {
-                        eprintln!("Usage: plugin manifest <module.wasm|module.wat>");
-                    }
-                }
-                _ => {
-                    eprintln!("Usage: plugin <run|manifest> ...");
-                }
-            }
-            continue;
-        }
-
-        match parser::parse_line(trimmed_input) {
-            Ok(ast) => {
-                // If the parsed AST looks like a CLI invocation that was
-                // accidentally parsed as subtraction (e.g. `ls -la` -> `ls - la`),
-                // fall back to executing the system command.
-                    if let Some((cmd, args)) = probable_cli_from_ast(&ast) {
-                    job_control::spawn_and_wait(&cmd, &args);
-                } else {
-                    println!("Parsed AST: {:#?}", ast);
-                }
+            Ok(Signal::CtrlD) => {
+                // EOF — exit cleanly
+                println!();
+                break;
             }
             Err(err) => {
-                eprintln!("Parse error: {}", err);
-                job_control::spawn_and_wait(&parts[0], &parts[1..].to_vec());
+                eprintln!("Input error: {}", err);
+                break;
             }
         }
     }
@@ -241,7 +259,6 @@ fn execute_system_command(cmd: &str, args: &[String]) {
         cmd
     };
 
-    // Deprecated: routed to job_control::spawn_and_wait in main
     job_control::spawn_and_wait(command_name, args);
 }
 
