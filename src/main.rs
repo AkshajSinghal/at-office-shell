@@ -3,6 +3,7 @@ mod parser;
 mod job_control;
 mod terminal;
 mod wasm_host;
+mod tty;
 
 use crate::dotfiles::import_dotfiles;
 use crate::wasm_host::{load_plugin_manifest, WasmPlugin};
@@ -16,6 +17,21 @@ fn main() {
 
     // Initialize job control and signal handlers
     job_control::init_signal_handlers();
+
+    // Save the current terminal attributes so we can restore them on panic/abnormal exit.
+    if let Err(e) = tty::save_original_termios() {
+        eprintln!("warning: failed to save terminal settings: {}", e);
+    }
+
+    // Install a panic hook that restores the terminal before printing panic info / exiting.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // best-effort restore
+        crate::tty::restore_original_termios();
+        // call the default hook so panic info still appears
+        default_hook(info);
+    }));
+
     if let Ok(home) = std::env::var("HOME") {
         match import_dotfiles(std::path::Path::new(&home)) {
             Ok(imports) => {

@@ -10,6 +10,8 @@ use std::os::unix::process::CommandExt;
 
 use libc;
 
+use crate::tty;
+
 static FG_PGID: Lazy<AtomicI32> = Lazy::new(|| AtomicI32::new(0));
 
 pub fn init_signal_handlers() {
@@ -21,6 +23,9 @@ pub fn init_signal_handlers() {
                 libc::SIGCHLD,
                 libc::SIGINT,
                 libc::SIGTSTP,
+                libc::SIGTERM,
+                libc::SIGQUIT,
+                libc::SIGHUP,
             ]) {
                 Ok(s) => s,
                 Err(e) => {
@@ -52,6 +57,13 @@ pub fn init_signal_handlers() {
                         if pgid > 0 {
                             unsafe { libc::kill(-(pgid as libc::pid_t), libc::SIGTSTP) };
                         }
+                    }
+                    libc::SIGTERM | libc::SIGQUIT | libc::SIGHUP => {
+                        // Best-effort: restore terminal state before exiting
+                        crate::tty::restore_original_termios();
+                        // Exit with a code indicating signal termination.
+                        // Use 128 + signo as conventional shell exit code for signals.
+                        std::process::exit(128 + signal);
                     }
                     _ => {}
                 }
