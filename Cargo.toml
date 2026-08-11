@@ -21,3 +21,9 @@ wat = "1.0"
 
 # PTY-backed job support
 portable-pty = "0.10"
+# tokenization / globbing
+shlex = "1.1"
+globset = "0.4"
+shellexpand = "2.1"
+# REPL line editing and persistent history
+reedline = "0.10"
