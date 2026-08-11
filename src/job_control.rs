@@ -2,7 +2,12 @@ use once_cell::sync::Lazy;
 use std::process::Command;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::thread;
+use std::io::{self, Read, Write};
+use std::time::Duration;
+
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
+
 use libc;
 
 static FG_PGID: Lazy<AtomicI32> = Lazy::new(|| AtomicI32::new(0));

@@ -19,6 +19,8 @@ serde_json = "1.0"
 wasmtime = "11"
 wat = "1.0"
 
+# PTY-backed job support
+portable-pty = "0.10"
 # tokenization / globbing
 shlex = "1.1"
 globset = "0.4"
