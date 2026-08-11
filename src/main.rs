@@ -8,8 +8,7 @@ use crate::dotfiles::import_dotfiles;
 use crate::wasm_host::{load_plugin_manifest, WasmPlugin};
 use std::io::{self, Write};
 
-use reedline::{DefaultPrompt, Reedline, Signal};
-use reedline::history::FileBackedHistory;
+use reedline::{Reedline, Signal, DefaultPrompt, FileBackedHistory};
 use std::path::PathBuf;
 
 fn main() {
@@ -38,16 +37,20 @@ fn main() {
     // --- reedline setup ---
     // Use the same ANSI-colored prompt returned by terminal.prompt()
     let prompt_text = terminal.prompt();
-    let prompt = DefaultPrompt::new(prompt_text.clone());
-    let mut line_editor = Reedline::create();
+    // DefaultPrompt::new in reedline 0.10 expects three strings: (left, indicator, multiline_indicator)
+    // We supply the terminal's ANSI prompt as the left section and simple indicators for the others.
+    let prompt = DefaultPrompt::new(prompt_text.clone(), " ".to_string(), "... ".to_string());
 
-    // Setup history file at $HOME/.trushell_history
-    if let Ok(home) = std::env::var("HOME") {
+    // Initialize Reedline with a file-backed history if available.
+    let mut line_editor = if let Ok(home) = std::env::var("HOME") {
         let hist_path = PathBuf::from(home).join(".trushell_history");
-        if let Ok(history) = FileBackedHistory::with_file(1000, hist_path) {
-            line_editor.set_history(Box::new(history));
+        match FileBackedHistory::with_file(1000, hist_path) {
+            Ok(history) => Reedline::with_history(Box::new(history)),
+            Err(_) => Reedline::create(),
         }
-    }
+    } else {
+        Reedline::create()
+    };
     // -----------------------
 
     loop {
