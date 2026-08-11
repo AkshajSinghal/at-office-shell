@@ -2,7 +2,7 @@
 name = "trushell"
 version = "0.1.0"
 edition = "2021"
-authors = ["TruFoundation <noreply@trufoundation.org>"]
+authors = ["TruFoundation"]
 
 [dependencies]
 anyhow = "1.0"
